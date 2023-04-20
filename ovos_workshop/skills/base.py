@@ -30,6 +30,7 @@ from lingua_franca.format import pronounce_number, join_list
 from lingua_franca.parse import yes_or_no, extract_number
 from ovos_backend_client.api import EmailApi, MetricsApi
 from ovos_bus_client.message import Message, dig_for_message
+from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_utils import camel_case_split
@@ -875,7 +876,7 @@ class BaseSkill:
         """
         return False
 
-    def __get_response(self):
+    def __get_response_v1(self):
         """Helper to get a response from the user
 
         NOTE:  There is a race condition here.  There is a small amount of
@@ -905,6 +906,7 @@ class BaseSkill:
         # 10 for listener, 5 for SST, then timeout
         # NOTE: a threading.Event is not used otherwise we can't raise the
         # AbortEvent exception to kill the thread
+        # this is for compat with killable_intents decorators
         start = time.time()
         while time.time() - start <= 15 and not converse.finished:
             time.sleep(0.1)
@@ -916,6 +918,83 @@ class BaseSkill:
                 converse.response = self.__response  # external override
         self.converse = self.__original_converse
         return converse.response
+
+    # get response V2
+    def __get_response(self):
+        """Helper to get a response from the user
+
+        this method is unsafe and contains a race condition for
+         multiple simultaneous queries in ovos-core < 0.0.8
+
+        Returns:
+            str: user's response or None on a timeout
+        """
+
+        # in ovos-core < 0.0.8 we reassign the converse method itself
+        is_old = False
+        try:
+            from mycroft.version import OVOS_VERSION_MAJOR, OVOS_VERSION_MINOR, OVOS_VERSION_BUILD, OVOS_VERSION_ALPHA
+            if OVOS_VERSION_MAJOR == 0 and OVOS_VERSION_MINOR == 0 and OVOS_VERSION_BUILD <= 8 and OVOS_VERSION_ALPHA < 5:
+                is_old = True
+        except ImportError:
+            # standalone usage without core
+            pass
+
+        self.bus.emit(Message("skill.converse.get_response.enable",
+                              {"skill_id": self.skill_id}))
+
+        if is_old:  # NOT SAFE for multiple users at same time
+            res = self.__get_response_v1()
+            self.bus.emit(Message("skill.converse.get_response.disable",
+                                  {"skill_id": self.skill_id}))
+            return res
+
+        self._activate()
+        utterances = []
+        lang = self.lang  # unused, but we get this info together with utterance if needed
+        # user could switch lang midway, maybe ignore response in this case (?)
+
+        sess = SessionManager.get()
+
+        def _handle_get_response(message):
+            nonlocal utterances, lang
+
+            skill_id = message.data["skill_id"]
+            if skill_id != self.skill_id:
+                return  # not for us!
+
+            # validate session_id to ensure this isnt another
+            # user querying the skill at same time
+            sess2 = SessionManager.get(message)
+            if sess.session_id != sess2.session_id:
+                return  # not for us!
+
+            utterances = message.data["utterances"]
+            lang = message.data["lang"]
+            # received get_response
+
+        self.bus.on("skill.converse.get_response", _handle_get_response)
+
+        # NOTE: a threading.Event is not used otherwise we can't raise the
+        # AbortEvent exception to kill the thread
+        # this is for compat with killable_intents decorators
+        start = time.time()
+        while time.time() - start <= 15 and not len(utterances):
+            time.sleep(0.1)
+            if self.__response is not False:
+                if self.__response is None:
+                    # aborted externally (if None)
+                    self.log.debug("get_response aborted")
+                else:
+                    utterances = [self.__response]  # external override
+
+        self.bus.remove("skill.converse.get_response", _handle_get_response)
+        self.bus.emit(Message("skill.converse.get_response.disable",
+                              {"skill_id": self.skill_id}))
+
+        if utterances:
+            return utterances[0]
+        return None
 
     def get_response(self, dialog='', data=None, validator=None,
                      on_fail=None, num_retries=-1):
