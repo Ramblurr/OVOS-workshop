@@ -929,6 +929,8 @@ class BaseSkill:
         Returns:
             str: user's response or None on a timeout
         """
+        srcm = dig_for_message() or Message("", context={"source": "skills",
+                                                         "skill_id": self.skill_id})
 
         # in ovos-core < 0.0.8 we reassign the converse method itself
         is_old = False
@@ -945,24 +947,22 @@ class BaseSkill:
                 # standalone usage without core
                 pass
 
-        self.bus.emit(Message("skill.converse.get_response.enable",
-                              {"skill_id": self.skill_id}))
+        self.bus.emit(srcm.forward("skill.converse.get_response.enable",
+                                   {"skill_id": self.skill_id}))
 
         if is_old:  # NOT SAFE for multiple users at same time
             res = self.__get_response_v1()
-            self.bus.emit(Message("skill.converse.get_response.disable",
-                                  {"skill_id": self.skill_id}))
+            self.bus.emit(srcm.forward("skill.converse.get_response.disable",
+                                       {"skill_id": self.skill_id}))
             return res
 
         self._activate()
         utterances = []
-        lang = self.lang  # unused, but we get this info together with utterance if needed
-        # user could switch lang midway, maybe ignore response in this case (?)
 
         sess = SessionManager.get()
 
         def _handle_get_response(message):
-            nonlocal utterances, lang
+            nonlocal utterances
 
             skill_id = message.data["skill_id"]
             if skill_id != self.skill_id:
@@ -975,7 +975,6 @@ class BaseSkill:
                 return  # not for us!
 
             utterances = message.data["utterances"]
-            lang = message.data["lang"]
             # received get_response
 
         self.bus.on("skill.converse.get_response", _handle_get_response)
@@ -994,8 +993,8 @@ class BaseSkill:
                     utterances = [self.__response]  # external override
 
         self.bus.remove("skill.converse.get_response", _handle_get_response)
-        self.bus.emit(Message("skill.converse.get_response.disable",
-                              {"skill_id": self.skill_id}))
+        self.bus.emit(srcm.forward("skill.converse.get_response.disable",
+                                   {"skill_id": self.skill_id}))
 
         if utterances:
             return utterances[0]
