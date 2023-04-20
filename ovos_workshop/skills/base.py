@@ -937,8 +937,13 @@ class BaseSkill:
             if OVOS_VERSION_MAJOR == 0 and OVOS_VERSION_MINOR == 0 and OVOS_VERSION_BUILD <= 8 and OVOS_VERSION_ALPHA < 5:
                 is_old = True
         except ImportError:
-            # standalone usage without core
-            pass
+            try:
+                # classic mycroft-core / not ovos
+                from mycroft.version import CORE_VERSION_MAJOR
+                is_old = True
+            except ImportError:
+                # standalone usage without core
+                pass
 
         self.bus.emit(Message("skill.converse.get_response.enable",
                               {"skill_id": self.skill_id}))
