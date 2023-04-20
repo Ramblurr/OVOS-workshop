@@ -219,14 +219,8 @@ class OVOSSkill(MycroftSkill):
     def __get_response(self):
         """Helper to get a response from the user
 
-        NOTE:  There is a race condition here.  There is a small amount of
-        time between the end of the device speaking and the converse method
-        being overridden in this method.  If an utterance is injected during
-        this time, the wrong converse method is executed.  The condition is
-        hidden during normal use due to the amount of time it takes a user
-        to speak a response. The condition is revealed when an automated
-        process injects an utterance quicker than this method can flip the
-        converse methods.
+        this method is unsafe and contains a race condition for
+         multiple simultaneous queries in ovos-core < 0.0.8
 
         Returns:
             str: user's response or None on a timeout
@@ -281,11 +275,20 @@ class OVOSSkill(MycroftSkill):
         lang = self.lang  # unused, but we get this info together with utterance if needed
         # user could switch lang midway, maybe ignore response in this case (?)
 
+        from ovos_bus_client.session import SessionManager
+        sess = SessionManager.get()
+
         def _handle_get_response(message):
             nonlocal utterances, lang
 
             skill_id = message.data["skill_id"]
             if skill_id != self.skill_id:
+                return  # not for us!
+
+            # validate session_id to ensure this isnt another
+            # user querying the skill at same time
+            sess2 = SessionManager.get(message)
+            if sess.session_id != sess2.session_id:
                 return  # not for us!
 
             utterances = message.data["utterances"]
@@ -306,6 +309,7 @@ class OVOSSkill(MycroftSkill):
                 else:
                     utterances = [self.__response]  # external override
 
+        self.bus.remove("skill.converse.get_response", _handle_get_response)
         self.bus.emit(Message("skill.converse.get_response.disable",
                               {"skill_id": self.skill_id}))
 
