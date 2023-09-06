@@ -1887,6 +1887,8 @@ class BaseSkill:
         require a verbal response. This is intended to provide simple feedback
         to the user that their request was handled successfully.
         """
+        # DEPRECATED - note that this is a staticmethod and uses the old endpoint
+        # the OVOSSkill class does things properly
         return play_acknowledge_sound()
 
     # method named init_dialog in mycroft-core
