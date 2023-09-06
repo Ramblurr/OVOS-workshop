@@ -158,6 +158,17 @@ class OVOSSkill(MycroftSkill):
         """
         self._deactivate()
 
+    def acknowledge(self):
+        """
+        Acknowledge a successful request.
+
+        This method plays a sound to acknowledge a request that does not
+        require a verbal response. This is intended to provide simple feedback
+        to the user that their request was handled successfully.
+        """
+        audio_file = self.config_core.get('sounds', {}).get('acknowledge', 'acknowledge.mp3')
+        self.play_audio(audio_file, instant=True)
+
     def play_audio(self, filename: str, instant: bool = False):
         """
         Queue and audio file for playback
