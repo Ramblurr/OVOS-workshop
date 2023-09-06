@@ -1878,19 +1878,6 @@ class BaseSkill:
             )
             self.speak(key, expect_response, wait, {})
 
-    @staticmethod
-    def acknowledge():
-        """
-        Acknowledge a successful request.
-
-        This method plays a sound to acknowledge a request that does not
-        require a verbal response. This is intended to provide simple feedback
-        to the user that their request was handled successfully.
-        """
-        # DEPRECATED - note that this is a staticmethod and uses the old endpoint
-        # the OVOSSkill class does things properly
-        return play_acknowledge_sound()
-
     # method named init_dialog in mycroft-core
     def load_dialog_files(self, root_directory: Optional[str] = None):
         """
