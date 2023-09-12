@@ -173,6 +173,8 @@ class BaseSkill:
         self.res_dir = resources_dir or self.root_dir
 
         self.gui = gui
+        is_bus_null = bus == None
+        LOG.info(f"XXX BaseSkill ctor bus is None?={is_bus_null}")
         self._bus = bus
         self._enclosure = EnclosureAPI()
 
@@ -404,6 +406,8 @@ class BaseSkill:
         """
         from ovos_bus_client import MessageBusClient
         from ovos_utils.messagebus import FakeBus
+        is_bus_null = value == None
+        LOG.info(f"XXX BaseClass.bus setter bus is None?={is_bus_null} {type(value)}")
         if isinstance(value, (MessageBusClient, FakeBus)):
             self._bus = value
         else:

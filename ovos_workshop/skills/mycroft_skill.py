@@ -46,8 +46,12 @@ class _SkillMetaclass(ABCMeta):
         skill_id = None
 
         if "bus" not in kwargs:
+            is_bus_null = bus == None
+            LOG.info(f"XXX _SkillMetaclass ctor bus is NOT IN kwargs and is None?={is_bus_null}")
             for a in args:
                 if isinstance(a, MessageBusClient) or isinstance(a, FakeBus):
+                    is_bus_null = bus == None
+                    LOG.info(f"XXX _SkillMetaclass ctor bus is IN args and is None?={is_bus_null}")
                     bus = a
                     LOG.warning(
                         f"bus should be a kwarg, guessing {a} is the bus")
@@ -63,6 +67,8 @@ class _SkillMetaclass(ABCMeta):
             skill_id = kwargs.pop("skill_id")
         if "bus" in kwargs:
             bus = kwargs.pop("bus")
+            is_bus_null = bus == None
+            LOG.info(f"XXX _SkillMetaclass ctor bus is inside kwargs and is None?={is_bus_null}")
         if not skill_id:
             LOG.warning(f"skill_id should be a kwarg, please update "
                         f"{cls.__name__}")
@@ -134,6 +140,9 @@ class MycroftSkill(BaseSkill, metaclass=_SkillMetaclass):
         @param bus: MessageBusClient to bind to skill
         @param use_settings: DEPRECATED option to disable settings sync
         """
+
+        is_bus_null = bus == None
+        LOG.info(f"XXX MycroftSkill ctor bus is None?={is_bus_null}")
         super().__init__(name=name, bus=bus, *args, **kwargs)
 
         self._initial_settings = {}

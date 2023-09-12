@@ -2,7 +2,7 @@ from os.path import isdir, join
 from typing import Optional
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_utils.messagebus import get_mycroft_bus
-from ovos_utils.log import log_deprecation
+from ovos_utils.log import LOG, log_deprecation
 from ovos_utils.gui import GUIInterface
 from ovos_bus_client.client.client import MessageBusClient
 from ovos_workshop.resource_files import locate_lang_directories
@@ -29,16 +29,24 @@ class OVOSAbstractApplication(OVOSSkill):
             this application to manage default settings and backend sync
         """
         self._dedicated_bus = False
+
+        is_bus_null = bus == None
+        LOG.info(f"XXX OVOSAbstractApplication ctor is None?={is_bus_null}")
         if bus:
             self._dedicated_bus = False
         else:
             self._dedicated_bus = True
             bus = get_mycroft_bus()
 
-        super().__init__(skill_id=skill_id, bus=bus, gui=gui,
+        kwargs["bus"] = bus
+        kwargs["skill_id"] = skill_id
+
+        super().__init__(gui=gui,
                          resources_dir=resources_dir,
                          enable_settings_manager=enable_settings_manager,
                          **kwargs)
+        is_bus_null = self.bus == None
+        LOG.info(f"XXX after OVOSAbstractApplication ctor super is self.bus None?={is_bus_null}")
 
         if settings:
             log_deprecation(f"Settings should be set in {self._settings_path}. "
